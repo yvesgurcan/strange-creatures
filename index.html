@@ -9,6 +9,118 @@
   <script>
   "use strict";
 
+  const {
+    PI,
+    cos,
+    sin,
+    tan,
+    acos,
+    asin,
+    atan,
+    abs,
+    sqrt,
+    pow,
+    min,
+    max,
+    ceil,
+    floor,
+    round,
+    random,
+    atan2 } =
+  Math;
+  const HALF_PI = 0.5 * PI;
+  const QUART_PI = 0.25 * PI;
+  const TAU = 2 * PI;
+  const TO_RAD = PI / 180;
+  const G = 6.67 * pow(10, -11);
+  const EPSILON = 2.220446049250313e-16;
+  const rand = n => n * random();
+  const randIn = (_min, _max) => rand(_max - _min) + _min;
+  const randRange = n => n - rand(2 * n);
+  const fadeIn = (t, m) => t / m;
+  const fadeOut = (t, m) => (m - t) / m;
+  const fadeInOut = (t, m) => {
+    let hm = 0.5 * m;
+    return abs((t + hm) % m - hm) / hm;
+  };
+  const dist = (x1, y1, x2, y2) => sqrt(pow(x2 - x1, 2) + pow(y2 - y1, 2));
+  const angle = (x1, y1, x2, y2) => atan2(y2 - y1, x2 - x1);
+  const lerp = (a, b, amt) => (1 - amt) * a + amt * b;
+  const vh = p => p * window.innerHeight * 0.01;
+  const vw = p => p * window.innerWidth * 0.01;
+  const vmin = p => min(vh(p), vw(p));
+  const vmax = p => max(vh(p), vw(p));
+  const clamp = (n, _min, _max) => min(max(n, _min), _max);
+  const norm = (n, _min, _max) => (n - _min) / (_max - _min);
+
+  Array.prototype.lerp = function (t = [], a = 0) {
+    this.forEach((n, i) => this[i] = lerp(n, t[i], a));
+  };
+
+  Float32Array.prototype.get = function (i = 0, n = 0) {
+    const t = i + n;
+
+    let r = [];
+
+    for (; i < t; i++) {
+      r.push(this[i]);
+    }
+
+    return r;
+  };
+
+  class PropsArray {
+    constructor(count = 0, props = []) {
+      this.count = count;
+      this.props = props;
+      this.spread = props.length; // TODO: Need to implement indexing based on spread
+      this.values = new Float32Array(count * props.length);
+    }
+    get length() {
+      return this.values.length;
+    }
+    set(a = [], i = 0) {
+      this.values.set(a, i);
+    }
+    setMap(o = {}, i = 0) {
+      this.set(Object.values(o), i);
+    }
+    get(i = 0) {
+      return this.values.get(i, this.spread);
+    }
+    getMap(i = 0) {
+      return this.get(i).reduce(
+      (r, v, i) => ({
+        ...r,
+        ...{ [this.props[i]]: v } }),
+
+      {});
+
+    }
+    forEach(cb) {
+      let i = 0;
+
+      for (; i < this.length; i += this.spread) {
+        cb(this.get(this, i), i, this);
+      }
+    }
+    map(cb) {
+      let i = 0;
+
+      for (; i < this.length; i += this.spread) {
+        this.set(cb(this.get(this, i), i, this), i);
+      }
+    }
+    async *read() {
+      let i = 0;
+
+      for (; i < this.length; i += this.spread) {
+        yield { index: i, value: this.get(i) };
+      }
+    }}
+
+  "use strict";
+
   const backgroundColor = "rgba(0,0,10,0.5)";
   const baseHue = rand(360);
   const rangeHue = 180;
@@ -66,9 +178,9 @@
       let t = simplex.noise3D(this.base[0] * 0.005, this.base[1] * 0.005, tick * 0.005) * TAU;
 
       this.base.lerp([
-        this.base[0] + 20 * cos(t),
-        this.base[1] + 20 * sin(t)
-      ], 0.025);
+      this.base[0] + 20 * cos(t),
+      this.base[1] + 20 * sin(t)],
+      0.025);
     }
     async update() {
       let target = this.position;
@@ -80,31 +192,31 @@
 
       for (; i >= 0; i -= this.segmentProps.length) {
         promises.push(
-          new Promise(resolve => {
-            let [x1, y1, x2, y2, l, d, h] = this.segments.get(i);
-            let t, n, tn;
+        new Promise(resolve => {
+          let [x1, y1, x2, y2, l, d, h] = this.segments.get(i);
+          let t, n, tn;
 
-            x1 = target[0];
-            y1 = target[1];
-            t = angle(x1, y1, x2, y2);
-            n = simplex.noise3D(
-              x1 * 0.005,
-              y1 * 0.005,
-              (i + tick) * 0.005
-            );
-            tn = t + (n * PI * 0.0125);
-            x2 = x1 + l * cos(tn);
-            y2 = y1 + l * sin(tn);
-            d = t;
+          x1 = target[0];
+          y1 = target[1];
+          t = angle(x1, y1, x2, y2);
+          n = simplex.noise3D(
+          x1 * 0.005,
+          y1 * 0.005,
+          (i + tick) * 0.005);
 
-            target = [x2, y2];
+          tn = t + n * PI * 0.0125;
+          x2 = x1 + l * cos(tn);
+          y2 = y1 + l * sin(tn);
+          d = t;
 
-            this.segments.set([x1, y1, x2, y2, l, d], i);
-            this.drawSegment(x1, y1, x2, y2, h, n, i);
+          target = [x2, y2];
 
-            resolve();
-          })
-        );
+          this.segments.set([x1, y1, x2, y2, l, d], i);
+          this.drawSegment(x1, y1, x2, y2, h, n, i);
+
+          resolve();
+        }));
+
       }
 
       await Promise.all(promises);
@@ -126,8 +238,8 @@
       this.ctx.arc(x1, y1, fn * 3, 0, TAU);
       this.ctx.stroke();
       this.ctx.closePath();
-    }
-  }
+    }}
+
 
   function setup() {
     tick = 0;
@@ -143,12 +255,12 @@
       d = randRange(colonyRadius);
       t = i / tentacleCount * TAU;
       tentacle = new Tentacle(
-        center[0] + d * cos(t),
-        center[1] + d * sin(t),
-        round(randIn(segmentCountMin, segmentCountMax)),
-        round(randIn(segmentLengthMin, segmentLengthMax)),
-        t
-      );
+      center[0] + d * cos(t),
+      center[1] + d * sin(t),
+      round(randIn(segmentCountMin, segmentCountMax)),
+      round(randIn(segmentLengthMin, segmentLengthMax)),
+      t);
+
       tentacle.setCtx(ctx.a);
       tentacles.push(tentacle);
     }
@@ -159,8 +271,8 @@
   function createCanvas() {
     canvas = {
       a: document.createElement("canvas"),
-      b: document.createElement("canvas")
-    };
+      b: document.createElement("canvas") };
+
     canvas.b.style = `
       position: absolute;
       top: 0;
@@ -171,8 +283,8 @@
     document.body.appendChild(canvas.b);
     ctx = {
       a: canvas.a.getContext("2d"),
-      b: canvas.b.getContext("2d")
-    };
+      b: canvas.b.getContext("2d") };
+
     center = [0.5 * canvas.a.width, 0.5 * canvas.a.height];
   }
 
@@ -232,23 +344,23 @@
 
   window.addEventListener("load", setup);
   window.addEventListener("resize", resize);
-  window.addEventListener("mousemove", (e) => {
+  window.addEventListener("mousemove", e => {
     tentacles.forEach((tentacle, i) => {
       const t = i / tentacles.length * TAU;
       tentacle.setTarget([e.clientX + colonyRadius * cos(t + tick * 0.05), e.clientY + colonyRadius * sin(t + tick * 0.05)]);
       tentacle.follow = true;
-    })
+    });
   });
   window.addEventListener("mouseout", () => {
     tentacles.forEach(tentacle => {
       tentacle.base = [
-        center[0] + colonyRadius * cos(rand(TAU)),
-        center[1] + colonyRadius * sin(rand(TAU))
-      ];
+      center[0] + colonyRadius * cos(rand(TAU)),
+      center[1] + colonyRadius * sin(rand(TAU))];
+
       tentacle.setTarget(tentacle.base);
       tentacle.follow = false;
     });
-  })
+  });
   </script>
   <body>
   </body>
