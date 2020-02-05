@@ -1,5 +1,3 @@
-# strange-creatures
+The Colony
 
-By Sean Free.
-
-Copied from https://codepen.io/seanfree/pen/xNvWag.
+Source: https://codepen.io/seanfree/pen/xNvWag.
